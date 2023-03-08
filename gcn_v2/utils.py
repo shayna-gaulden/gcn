@@ -5,7 +5,7 @@ import scipy.sparse as sp
 #from scipy.sparse.linalg.eigen.arpack import eigsh
 from scipy.sparse.linalg import eigsh
 import sys
-
+from collections import defaultdict
 
 def parse_index_file(filename):
     """Parse index file."""
@@ -52,7 +52,18 @@ def load_data(dataset_str):
                 objects.append(pkl.load(f))
 
     x, y, tx, ty, allx, ally, graph = tuple(objects)
-    test_idx_reorder = parse_index_file("data/ind.{}.test.index".format(dataset_str))
+    print(x.shape)
+    print(tx.shape)
+    print(allx.shape)
+    print(y.shape)
+    print(ty.shape)
+    print(ally.shape)
+    try:
+        test_idx_reorder = parse_index_file("data/ind.{}.test.index".format(dataset_str))
+    except:
+        with open("data/ind.{}.test.index".format(dataset_str), 'rb') as f:
+            test_idx_reorder = pkl.load(f, encoding='latin1')
+
     test_idx_range = np.sort(test_idx_reorder)
 
     if dataset_str == 'citeseer':
@@ -68,7 +79,10 @@ def load_data(dataset_str):
 
     features = sp.vstack((allx, tx)).tolil()
     features[test_idx_reorder, :] = features[test_idx_range, :]
-    adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
+    if (type(graph) is defaultdict):
+        adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
+    else:
+        adj = nx.adjacency_matrix(nx.from_scipy_sparse_array(graph))
 
     labels = np.vstack((ally, ty))
     labels[test_idx_reorder, :] = labels[test_idx_range, :]
@@ -145,7 +159,6 @@ def construct_feed_dict(features, support, labels, labels_mask, placeholders):
     feed_dict.update({placeholders['support'][i]: support[i] for i in range(len(support))})
     feed_dict.update({placeholders['num_features_nonzero']: features[1].shape})
     return feed_dict
-
 
 def chebyshev_polynomials(adj, k):
     """Calculate Chebyshev polynomials up to order k. Return a list of sparse matrices (tuple representation)."""
