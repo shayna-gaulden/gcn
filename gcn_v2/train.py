@@ -65,8 +65,9 @@ sess = tf.Session()
 def evaluate(features, support, labels, mask, placeholders):
     t_test = time.time()
     feed_dict_val = construct_feed_dict(features, support, labels, mask, placeholders)
-    outs_val = sess.run([model.loss, model.accuracy], feed_dict=feed_dict_val)
-    return outs_val[0], outs_val[1], (time.time() - t_test)
+    outs_val = sess.run(
+        [model.loss, model.hamloss, model.pred], feed_dict=feed_dict_val)
+    return outs_val[0], outs_val[1], outs_val[2], (time.time() - t_test)
 
 
 # Init variables
@@ -83,16 +84,16 @@ for epoch in range(FLAGS.epochs):
     feed_dict.update({placeholders['dropout']: FLAGS.dropout})
 
     # Training step
-    outs = sess.run([model.opt_op, model.loss, model.accuracy], feed_dict=feed_dict)
+    outs = sess.run([model.opt_op, model.loss, model.hamloss], feed_dict=feed_dict)
 
     # Validation
-    cost, acc, duration = evaluate(features, support, y_val, val_mask, placeholders)
+    cost, acc, pred, duration = evaluate(features, support, y_val, val_mask, placeholders)
     cost_val.append(cost)
 
     # Print results
     print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(outs[1]),
-          "train_acc=", "{:.5f}".format(outs[2]), "val_loss=", "{:.5f}".format(cost),
-          "val_acc=", "{:.5f}".format(acc), "time=", "{:.5f}".format(time.time() - t))
+          "train_hamloss=", "{:.5f}".format(outs[2]), "val_loss=", "{:.5f}".format(cost),
+          "val_hamloss=", "{:.5f}".format(acc), "time=", "{:.5f}".format(time.time() - t))
 
     if epoch > FLAGS.early_stopping and cost_val[-1] > np.mean(cost_val[-(FLAGS.early_stopping+1):-1]):
         print("Early stopping...")
@@ -101,6 +102,8 @@ for epoch in range(FLAGS.epochs):
 print("Optimization Finished!")
 
 # Testing
-test_cost, test_acc, test_duration = evaluate(features, support, y_test, test_mask, placeholders)
+test_cost, test_acc,test_pred, test_duration = evaluate(features, support, y_test, test_mask, placeholders)
 print("Test set results:", "cost=", "{:.5f}".format(test_cost),
-      "accuracy=", "{:.5f}".format(test_acc), "time=", "{:.5f}".format(test_duration))
+      "hamming loss=", "{:.5f}".format(test_acc), "time=", "{:.5f}".format(test_duration))
+
+print(test_pred)

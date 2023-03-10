@@ -28,6 +28,7 @@ class Model(object):
 
         self.loss = 0
         self.accuracy = 0
+        self.hamloss = 0
         self.optimizer = None
         self.opt_op = None
 
@@ -53,6 +54,7 @@ class Model(object):
         # Build metrics
         self._loss()
         self._accuracy()
+        self._hamloss()
 
         self.opt_op = self.optimizer.minimize(self.loss)
 
@@ -63,6 +65,9 @@ class Model(object):
         raise NotImplementedError
 
     def _accuracy(self):
+        raise NotImplementedError
+
+    def _hamloss(self):
         raise NotImplementedError
 
     def save(self, sess=None):
@@ -107,6 +112,14 @@ class GCN(Model):
     def _accuracy(self):
         self.accuracy = masked_accuracy(self.outputs, self.placeholders['labels'],
                                         self.placeholders['labels_mask'])
+        self.pred = tf.argmax(self.outputs, 1)
+
+    def _hamloss(self):
+        self.hamloss = masked_hamming_loss(self.outputs, self.placeholders['labels'],
+                                        self.placeholders['labels_mask'])
+        thresh = tf.constant(0.3)
+        # prediciton based on output and threshold
+        self.pred = tf.math.greater(self.outputs, thresh, name=None)
 
     def _build(self):
 
@@ -135,4 +148,4 @@ class GCN(Model):
                                             logging=self.logging))
 
     def predict(self):
-        return tf.nn.softmax(self.outputs)
+        return tf.nn.sigmoid(self.outputs)
