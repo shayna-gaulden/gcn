@@ -29,7 +29,7 @@ flags.DEFINE_integer('max_degree', 3, 'Maximum Chebyshev polynomial degree.')
 
 # Load data
 adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = load_data(FLAGS.dataset)
-
+print(adj)
 # Some preprocessing
 features = preprocess_features(features)
 if FLAGS.model == 'gcn':
