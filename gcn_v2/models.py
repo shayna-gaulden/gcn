@@ -28,6 +28,8 @@ class Model(object):
 
         self.loss = 0
         self.accuracy = 0
+        self.hamloss = 0
+        self.alphaeval = 0
         self.optimizer = None
         self.opt_op = None
 
@@ -53,6 +55,8 @@ class Model(object):
         # Build metrics
         self._loss()
         self._accuracy()
+        self._hamloss()
+        self._alphaeval()
 
         self.opt_op = self.optimizer.minimize(self.loss)
 
@@ -63,6 +67,12 @@ class Model(object):
         raise NotImplementedError
 
     def _accuracy(self):
+        raise NotImplementedError
+
+    def _hamloss(self):
+        raise NotImplementedError
+
+    def _alphaeval(self):
         raise NotImplementedError
 
     def save(self, sess=None):
@@ -101,12 +111,29 @@ class GCN(Model):
             self.loss += FLAGS.weight_decay * tf.nn.l2_loss(var)
 
         # Cross entropy error
-        self.loss += masked_softmax_cross_entropy(self.outputs, self.placeholders['labels'],
+        self.loss += masked_sigmoid_cross_entropy(self.outputs, self.placeholders['labels'],
                                                   self.placeholders['labels_mask'])
 
     def _accuracy(self):
         self.accuracy = masked_accuracy(self.outputs, self.placeholders['labels'],
                                         self.placeholders['labels_mask'])
+        self.pred = tf.argmax(self.outputs, 1)
+
+    def _hamloss(self):
+        self.hamloss = masked_hamming_loss(self.outputs, self.placeholders['labels'],
+                                        self.placeholders['labels_mask'])
+        thresh = tf.constant(0.5)
+        # prediciton based on output and threshold
+        self.pred = tf.math.greater(self.outputs, thresh, name=None)
+        #self.pred = self.outputs
+    
+    def _alphaeval(self):
+        self.alphaeval = masked_alpha_eval(self.outputs, self.placeholders['labels'],
+                                           self.placeholders['labels_mask'])
+        thresh = tf.constant(0.5)
+        # prediciton based on output and threshold
+        self.pred = tf.math.greater(self.outputs, thresh, name=None)
+        # self.pred = self.outputs
 
     def _build(self):
 
@@ -118,21 +145,22 @@ class GCN(Model):
                                             sparse_inputs=True,
                                             logging=self.logging))
 
+        # self.layers.append(GraphConvolution(input_dim=FLAGS.hidden1,
+        #                                     output_dim=FLAGS.hidden2,
+        #                                     placeholders=self.placeholders,
+        #                                     act=tf.nn.relu,
+        #                                     dropout=True,
+        #                                     sparse_inputs=False,         # Inputs are no longer sparse
+        #                                     logging=self.logging))
+
+
         self.layers.append(GraphConvolution(input_dim=FLAGS.hidden1,
-                                            output_dim=FLAGS.hidden2,
-                                            placeholders=self.placeholders,
-                                            act=tf.nn.relu,
-                                            dropout=True,
-                                            sparse_inputs=False,         # Inputs are no longer sparse
-                                            logging=self.logging))
-
-
-        self.layers.append(GraphConvolution(input_dim=FLAGS.hidden2,
                                             output_dim=self.output_dim,
                                             placeholders=self.placeholders,
-                                            act=lambda x: x,
+                                            act=tf.nn.sigmoid,
                                             dropout=True,
                                             logging=self.logging))
 
     def predict(self):
-        return tf.nn.softmax(self.outputs)
+        thresh = tf.constant(0.5)
+        return tf.math.greater(self.outputs, thresh, name=None)
